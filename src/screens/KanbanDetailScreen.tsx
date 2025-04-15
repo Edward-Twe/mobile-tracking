@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react"
 import {
   View,
   Text,
@@ -13,7 +13,9 @@ import {
   Animated,
   Easing,
   Alert,
-} from "react-native";
+  Linking,
+  Platform,
+} from "react-native"
 import {
   Card,
   Title,
@@ -24,22 +26,19 @@ import {
   Dialog,
   Button,
   Provider as PaperProvider,
-} from "react-native-paper";
-import { useRoute, RouteProp } from "@react-navigation/native";
-import {
-  findSchedule,
-  type JobOrder,
-  type ScheduleDetails,
-} from "../services/api";
-import { sendLocationApi } from "../services/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Location from "expo-location";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAuth } from "../context/AuthContext";
-import { useOrganization } from "../context/OrganizationContext";
-import * as TaskManager from "expo-task-manager";
+} from "react-native-paper"
+import { useRoute, type RouteProp } from "@react-navigation/native"
+import { findSchedule, type JobOrder, type ScheduleDetails } from "../services/api"
+import { sendLocationApi } from "../services/api"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import * as Location from "expo-location"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { useAuth } from "../context/AuthContext"
+import { useOrganization } from "../context/OrganizationContext"
+import * as TaskManager from "expo-task-manager"
+import * as Notifications from "expo-notifications"
 
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get("window")
 
 // Status styling
 const statusColors = {
@@ -47,69 +46,88 @@ const statusColors = {
   inprogress: "#eab308",
   completed: "#22c55e",
   unscheduled: "#6b7280",
-};
+}
 
 const statusLabels = {
   todo: "To Do",
   inprogress: "In Progress",
   completed: "Completed",
   unscheduled: "Unscheduled",
-};
+}
 
-type OrderStatus = "todo" | "inprogress" | "completed" | "unscheduled";
+type OrderStatus = "todo" | "inprogress" | "completed" | "unscheduled"
 
 // Define the type for route params
 type RouteParams = {
   KanbanDetailScreen: {
-    scheduleId: string;
-  };
-};
+    scheduleId: string
+  }
+}
 
-const LOCATION_TRACKING = "location-tracking";
+const LOCATION_TRACKING = "location-tracking"
 
 export default function KanbanBoard() {
-  const [expandedAccordions, setExpandedAccordions] = useState<
-    Record<string, boolean>
-  >({});
-  const [schedule, setSchedule] = useState<ScheduleDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isTracking, setIsTracking] = useState(false);
-  const [locationDialogVisible, setLocationDialogVisible] = useState(false);
-  const [employee, setEmployee] = useState<any>(null);
-  const route = useRoute<RouteProp<RouteParams, "KanbanDetailScreen">>();
-  const scheduleId = route.params.scheduleId;
-  const { user } = useAuth();
-  const org = useOrganization();
+  const [expandedAccordions, setExpandedAccordions] = useState<Record<string, boolean>>({})
+  const [schedule, setSchedule] = useState<ScheduleDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isTracking, setIsTracking] = useState(false)
+  const [locationDialogVisible, setLocationDialogVisible] = useState(false)
+  const [employee, setEmployee] = useState<any>(null)
+  const route = useRoute<RouteProp<RouteParams, "KanbanDetailScreen">>()
+  const scheduleId = route.params.scheduleId
+  const { user } = useAuth()
+  const org = useOrganization()
 
   // Animation values
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(-100)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const locationUpdateInterval = useRef<NodeJS.Timeout | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current
+  const slideAnim = useRef(new Animated.Value(-100)).current
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const locationUpdateInterval = useRef<NodeJS.Timeout | null>(null)
 
   // Define the background task
   TaskManager.defineTask(LOCATION_TRACKING, async ({ data, error }) => {
     if (error) {
-      console.error(error);
-      return;
+      console.error("Location tracking task error:", error)
+      return
     }
-    if (data) {
-      const { locations } = data as { locations: Location.LocationObject[] };
-      const location = locations[0];
 
-      try {
-        await sendLocationApi({
-          userId: user.id,
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          scheduleId: scheduleId,
-          orgId: org.selectedOrganization!.id,
-        });
-      } catch (err) {
-        console.error("Error sending location:", err);
-      }
+    if (!data) {
+      console.log("No location data received")
+      return
     }
-  });
+
+    try {
+      const { locations } = data as { locations: Location.LocationObject[] }
+      const location = locations[0]
+
+      if (!location) {
+        console.log("Empty location data received")
+        return
+      }
+
+      console.log("Background location update received:", {
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+        timestamp: new Date(location.timestamp).toISOString(),
+      })
+
+      // Send location to API
+      await sendLocationApi({
+        userId: user.id,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        scheduleId: scheduleId,
+        orgId: org.selectedOrganization!.id,
+      })
+
+      console.log("Location successfully sent to API", {
+        scheduleId,
+        timestamp: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error("Error in location tracking task:", err)
+    }
+  })
 
   // Start pulse animation for tracking button
   const startPulseAnimation = () => {
@@ -127,9 +145,9 @@ export default function KanbanBoard() {
           easing: Easing.ease,
           useNativeDriver: true,
         }),
-      ])
-    ).start();
-  };
+      ]),
+    ).start()
+  }
 
   // Start slide in animation for cards
   const startSlideAnimation = () => {
@@ -138,8 +156,8 @@ export default function KanbanBoard() {
       duration: 500,
       easing: Easing.out(Easing.back(1.5)),
       useNativeDriver: true,
-    }).start();
-  };
+    }).start()
+  }
 
   // Start fade in animation
   const startFadeAnimation = () => {
@@ -147,110 +165,271 @@ export default function KanbanBoard() {
       toValue: 1,
       duration: 800,
       useNativeDriver: true,
-    }).start();
-  };
+    }).start()
+  }
 
   useEffect(() => {
     if (isTracking) {
-      startPulseAnimation();
+      startPulseAnimation()
     } else {
-      pulseAnim.setValue(1);
+      pulseAnim.setValue(1)
     }
-  }, [isTracking]);
+  }, [isTracking])
 
   useEffect(() => {
     if (!loading && schedule) {
-      startSlideAnimation();
-      startFadeAnimation();
+      startSlideAnimation()
+      startFadeAnimation()
     }
-  }, [loading, schedule]);
+  }, [loading, schedule])
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const employeeData = await AsyncStorage.getItem("employee");
+        const employeeData = await AsyncStorage.getItem("employee")
 
         if (!employeeData) {
-          console.error("Employee not found in AsyncStorage");
-          return;
+          console.error("Employee not found in AsyncStorage")
+          return
         }
 
-        const employeeObj = JSON.parse(employeeData);
-        setEmployee(employeeObj);
+        const employeeObj = JSON.parse(employeeData)
+        setEmployee(employeeObj)
 
         try {
-          setLoading(true);
-          const response = await findSchedule(scheduleId, employeeObj.id);
+          setLoading(true)
+          const response = await findSchedule(scheduleId, employeeObj.id)
 
           // Sort job orders by scheduledOrder if it exists
-          const sortedJobOrders = response.jobOrder.sort(
-            (a, b) => (a.scheduledOrder || 0) - (b.scheduledOrder || 0)
-          );
+          const sortedJobOrders = response.jobOrder.sort((a, b) => (a.scheduledOrder || 0) - (b.scheduledOrder || 0))
 
           setSchedule({
             ...response,
             jobOrder: sortedJobOrders,
-          });
+          })
         } catch (error) {
-          console.error("Error loading schedule:", error);
+          console.error("Error loading schedule:", error)
         } finally {
-          setLoading(false);
+          setLoading(false)
         }
       } catch (error) {
-        console.error("Error parsing employee data:", error);
+        console.error("Error parsing employee data:", error)
       }
-    };
+    }
 
-    fetchData();
+    fetchData()
 
     // Clean up location tracking on unmount
     return () => {
       if (locationUpdateInterval.current) {
-        clearInterval(locationUpdateInterval.current);
+        clearInterval(locationUpdateInterval.current)
       }
-    };
-  }, [scheduleId]);
+
+      // Also stop background tracking on unmount if it's running
+      const stopTrackingOnUnmount = async () => {
+        try {
+          const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING)
+          if (isTracking) {
+            await Location.stopLocationUpdatesAsync(LOCATION_TRACKING)
+            console.log("Location tracking stopped on component unmount")
+          }
+        } catch (error) {
+          console.error("Error stopping tracking on unmount:", error)
+        }
+      }
+
+      stopTrackingOnUnmount()
+    }
+  }, [scheduleId])
+
+  // Add this useEffect for notification channel setup
+  useEffect(() => {
+    const setupNotificationChannel = async () => {
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("location-tracking", {
+          name: "Location Tracking",
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#0891b2",
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: false,
+          description: "Notifications for location tracking service",
+        })
+      }
+    }
+
+    setupNotificationChannel()
+  }, [])
+
+  // Add this useEffect for notification permissions
+  useEffect(() => {
+    const requestNotificationPermissions = async () => {
+      const { status } = await Notifications.requestPermissionsAsync()
+      if (status !== "granted") {
+        console.log("Notification permissions denied")
+      } else {
+        console.log("Notification permissions granted")
+      }
+    }
+
+    requestNotificationPermissions()
+  }, [])
+
+  // Add this useEffect after your other useEffects
+  useEffect(() => {
+    const checkLocationTracking = async () => {
+      try {
+        const hasStartedTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING)
+        console.log("Location tracking status on mount:", hasStartedTracking)
+        setIsTracking(hasStartedTracking)
+      } catch (error) {
+        console.log("Error checking location tracking status:", error)
+      }
+    }
+
+    checkLocationTracking()
+  }, [])
 
   const toggleAccordion = (id: string) => {
     setExpandedAccordions((prev) => ({
       ...prev,
       [id]: !prev[id],
-    }));
-  };
+    }))
+  }
 
   const startLocationTracking = async () => {
     if (isTracking) {
-      await Location.stopLocationUpdatesAsync(LOCATION_TRACKING);
-      setIsTracking(false);
-      return;
+      try {
+        await Location.stopLocationUpdatesAsync(LOCATION_TRACKING)
+        console.log("Location tracking stopped")
+
+        // Clear the foreground interval
+        if (locationUpdateInterval.current) {
+          clearInterval(locationUpdateInterval.current)
+          locationUpdateInterval.current = null
+        }
+
+        // Show notification that tracking has stopped
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Location Tracking Stopped",
+            body: "Your location is no longer being tracked",
+            data: { type: "tracking_stopped" },
+          },
+          trigger: null,
+        })
+
+        setIsTracking(false)
+      } catch (error) {
+        console.error("Error stopping location tracking:", error)
+      }
+      return
     }
 
     try {
-      const { status } = await Location.requestBackgroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Denied",
-          "Background location permission is required"
-        );
-        return;
+      // First request foreground permissions
+      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync()
+
+      if (foregroundStatus !== "granted") {
+        Alert.alert("Permission Denied", "Location permission is required for tracking")
+        return
       }
 
-      await Location.startLocationUpdatesAsync(LOCATION_TRACKING, {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 5 * 60 * 1000, // 5 minutes
-        distanceInterval: 100, // meters
-        foregroundService: {
-          notificationTitle: "Location Tracking",
-          notificationBody: "Tracking your location for schedule",
-        },
-      });
+      // Then request background permissions
+      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync()
 
-      setIsTracking(true);
+      if (backgroundStatus !== "granted") {
+        // If background permission is denied, redirect to settings
+        Alert.alert(
+          "Background Location Required",
+          "This app needs background location access to track your location while on schedule. Please enable it in settings.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Open Settings",
+              onPress: () => Linking.openSettings(),
+            },
+          ],
+        )
+        return
+      }
+
+      // Show notification that tracking is starting
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Location Tracking Started",
+          body: "Your location is now being tracked in the background",
+          data: { type: "tracking_started" },
+        },
+        trigger: null,
+      })
+
+      console.log("Starting location tracking...")
+
+      // If permissions are granted, start tracking
+      await Location.startLocationUpdatesAsync(LOCATION_TRACKING, {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 300000, // 5 minutes
+        distanceInterval: 0, // Changed from 50 to 0 to ensure updates based on time only
+        foregroundService: {
+          notificationTitle: "AutoSched Location Tracking",
+          notificationBody: "Tracking your location while on schedule",
+          notificationColor: "#0891b2",
+        },
+        showsBackgroundLocationIndicator: true,
+      })
+
+      // Also add a manual foreground tracking fallback after the startLocationUpdatesAsync call:
+      // This ensures we get updates even if the background task isn't firing frequently
+
+      // Start a foreground interval as backup for more consistent updates
+      if (locationUpdateInterval.current) {
+        clearInterval(locationUpdateInterval.current)
+      }
+
+      locationUpdateInterval.current = setInterval(async () => {
+        if (!isTracking) return
+
+        try {
+          console.log("Foreground interval check for location...")
+          const { status } = await Location.getForegroundPermissionsAsync()
+
+          if (status !== "granted") {
+            console.log("Foreground permission not granted")
+            return
+          }
+
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.BestForNavigation,
+          })
+
+          console.log("Foreground location update:", {
+            lat: location.coords.latitude,
+            lng: location.coords.longitude,
+            timestamp: new Date().toISOString(),
+          })
+
+          await sendLocationApi({
+            userId: user.id,
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            scheduleId: scheduleId,
+            orgId: org.selectedOrganization!.id,
+          })
+
+          console.log("Foreground location sent to API")
+        } catch (error) {
+          console.error("Error in foreground location update:", error)
+        }
+      }, 300000) 
+
+      console.log("Location tracking started successfully")
+      setIsTracking(true)
     } catch (error) {
-      console.error("Error starting location tracking:", error);
-      Alert.alert("Error", "Unable to start location tracking");
+      console.error("Error starting location tracking:", error)
+      Alert.alert("Error", "Unable to start location tracking")
     }
-  };
+  }
 
   if (loading) {
     return (
@@ -262,7 +441,7 @@ export default function KanbanBoard() {
           </View>
         </SafeAreaView>
       </PaperProvider>
-    );
+    )
   }
 
   if (!schedule) {
@@ -270,30 +449,24 @@ export default function KanbanBoard() {
       <PaperProvider>
         <SafeAreaView style={styles.container}>
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="calendar-alert"
-              size={64}
-              color="#94a3b8"
-            />
+            <MaterialCommunityIcons name="calendar-alert" size={64} color="#94a3b8" />
             <Text style={styles.emptyText}>No schedule found</Text>
-            <Text style={styles.emptySubtext}>
-              The requested schedule could not be loaded
-            </Text>
+            <Text style={styles.emptySubtext}>The requested schedule could not be loaded</Text>
           </View>
         </SafeAreaView>
       </PaperProvider>
-    );
+    )
   }
 
   const renderJobOrderCard = ({
     item,
     index,
   }: {
-    item: JobOrder;
-    index: number;
+    item: JobOrder
+    index: number
   }) => {
     // Calculate staggered animation delay based on index
-    const animationDelay = index * 100;
+    const animationDelay = index * 100
 
     return (
       <Animated.View
@@ -316,46 +489,39 @@ export default function KanbanBoard() {
           <Card.Content>
             <View style={styles.cardHeader}>
               <View style={styles.cardTitleContainer}>
-                <Title style={styles.cardTitle}>
-                  Order #{item.orderNumber}
-                </Title>
+                <Title style={styles.cardTitle}>Order #{item.orderNumber}</Title>
                 <Chip
                   mode="outlined"
                   textStyle={{
-                    color: statusColors[item.status],
+                    color: statusColors[item.status as OrderStatus],
                     fontWeight: "bold",
+                    fontSize: 16,
                   }}
                   style={[
                     styles.statusChip,
-                    { borderColor: statusColors[item.status], height: 28 },
+                    {
+                      borderColor: statusColors[item.status as OrderStatus],
+                      backgroundColor: 'white',
+                      height: 36,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }
                   ]}
                 >
-                  {statusLabels[item.status]}
+                  {statusLabels[item.status as OrderStatus]}
                 </Chip>
               </View>
 
               <Paragraph style={styles.cardAddress}>{item.address}</Paragraph>
               <View style={styles.cardMetaContainer}>
                 <View style={styles.cardMetaItem}>
-                  <MaterialCommunityIcons
-                    name="package-variant"
-                    size={16}
-                    color="#6b7280"
-                  />
-                  <Text style={styles.cardMetaText}>
-                    Space: {item.spaceRequried}
-                  </Text>
+                  <MaterialCommunityIcons name="package-variant" size={16} color="#6b7280" />
+                  <Text style={styles.cardMetaText}>Space: {item.spaceRequried}</Text>
                 </View>
                 {item.JobOrderTask && (
                   <View style={styles.cardMetaItem}>
-                    <MaterialCommunityIcons
-                      name="clipboard-list"
-                      size={16}
-                      color="#6b7280"
-                    />
-                    <Text style={styles.cardMetaText}>
-                      Tasks: {item.JobOrderTask.length}
-                    </Text>
+                    <MaterialCommunityIcons name="clipboard-list" size={16} color="#6b7280" />
+                    <Text style={styles.cardMetaText}>Tasks: {item.JobOrderTask.length}</Text>
                   </View>
                 )}
               </View>
@@ -367,9 +533,7 @@ export default function KanbanBoard() {
               style={styles.accordion}
               expanded={expandedAccordions[item.id] || false}
               onPress={() => toggleAccordion(item.id)}
-              left={(props) => (
-                <List.Icon {...props} icon="clipboard-list-outline" />
-              )}
+              left={(props) => <List.Icon {...props} icon="clipboard-list-outline" />}
             >
               {item.JobOrderTask &&
                 item.JobOrderTask.map((jobOrderTask) => (
@@ -381,11 +545,7 @@ export default function KanbanBoard() {
                     descriptionStyle={styles.taskDescription}
                     left={(props) => (
                       <View style={styles.taskIconContainer}>
-                        <MaterialCommunityIcons
-                          name="circle-medium"
-                          size={24}
-                          color="#0891b2"
-                        />
+                        <MaterialCommunityIcons name="circle-medium" size={24} color="#0891b2" />
                       </View>
                     )}
                   />
@@ -394,8 +554,8 @@ export default function KanbanBoard() {
           </Card.Content>
         </Card>
       </Animated.View>
-    );
-  };
+    )
+  }
 
   return (
     <PaperProvider>
@@ -403,10 +563,7 @@ export default function KanbanBoard() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Schedule</Text>
           <TouchableOpacity
-            style={[
-              styles.trackingButton,
-              isTracking ? styles.trackingActive : styles.trackingInactive,
-            ]}
+            style={[styles.trackingButton, isTracking ? styles.trackingActive : styles.trackingInactive]}
             onPress={() => setLocationDialogVisible(true)}
           >
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
@@ -416,9 +573,7 @@ export default function KanbanBoard() {
                 color="white"
               />
             </Animated.View>
-            <Text style={styles.trackingButtonText}>
-              {isTracking ? "Tracking" : "Not Tracking"}
-            </Text>
+            <Text style={styles.trackingButtonText}>{isTracking ? "Tracking" : "Not Tracking"}</Text>
           </TouchableOpacity>
         </View>
 
@@ -429,11 +584,7 @@ export default function KanbanBoard() {
           contentContainerStyle={styles.columnContent}
           ListEmptyComponent={
             <View style={styles.emptyListContainer}>
-              <MaterialCommunityIcons
-                name="clipboard-text-off"
-                size={64}
-                color="#94a3b8"
-              />
+              <MaterialCommunityIcons name="clipboard-text-off" size={64} color="#94a3b8" />
               <Text style={styles.emptyColumnText}>No job orders assigned</Text>
             </View>
           }
@@ -446,9 +597,7 @@ export default function KanbanBoard() {
             style={styles.dialog}
           >
             <Dialog.Title style={styles.dialogTitle}>
-              {isTracking
-                ? "Stop Location Tracking?"
-                : "Start Location Tracking?"}
+              {isTracking ? "Stop Location Tracking?" : "Start Location Tracking?"}
             </Dialog.Title>
             <Dialog.Content>
               <Text style={styles.dialogContent}>
@@ -458,9 +607,7 @@ export default function KanbanBoard() {
               </Text>
             </Dialog.Content>
             <Dialog.Actions>
-              <Button onPress={() => setLocationDialogVisible(false)}>
-                Cancel
-              </Button>
+              <Button onPress={() => setLocationDialogVisible(false)}>Cancel</Button>
               <Button
                 mode="contained"
                 onPress={startLocationTracking}
@@ -473,7 +620,7 @@ export default function KanbanBoard() {
         </Portal>
       </SafeAreaView>
     </PaperProvider>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -558,7 +705,10 @@ const styles = StyleSheet.create({
     color: "#0f172a",
   },
   statusChip: {
-    height: 28,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 0,
+    minHeight: 24,
   },
   cardAddress: {
     fontSize: 14,
@@ -652,4 +802,5 @@ const styles = StyleSheet.create({
   stopButton: {
     backgroundColor: "#ef4444",
   },
-});
+})
+
