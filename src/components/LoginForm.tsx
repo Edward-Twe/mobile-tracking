@@ -8,6 +8,7 @@ import { z } from "zod"
 import PasswordInput from "./PasswordInput"
 import { useAuth } from "../context/AuthContext"
 import { navigate } from '../../navigationUtils'
+import { useOrganization } from "../context/OrganizationContext"
 
 // Define validation schema using zod
 const loginSchema = z.object({
@@ -21,6 +22,7 @@ const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { login } = useAuth()
+  const {clearSelectedOrg} = useOrganization();
 
   const {
     control,
@@ -45,6 +47,7 @@ const LoginForm = () => {
       const success = await login(data.username, data.password)
 
       if (success) {
+        clearSelectedOrg()
         navigate("Home")
       } else {
         setError("Invalid username or password")

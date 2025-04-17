@@ -49,21 +49,6 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         setOrganizations(data);
-
-        // Try to load previously selected organization
-        const savedOrgId = await AsyncStorage.getItem("selectedOrganizationId");
-        if (savedOrgId && data.length > 0) {
-          const savedOrg = data.find(
-            (org: Organization) => org.id === savedOrgId
-          );
-          if (savedOrg) {
-            setSelectedOrganization(savedOrg);
-          } else {
-            setSelectedOrganization(data[0]);
-          }
-        } else if (data.length > 0) {
-          setSelectedOrganization(data[0]);
-        }
       } catch (error) {
         console.error("Error loading organizations:", error);
         setOrganizations([]);

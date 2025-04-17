@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar"
 import { AuthProvider } from "./src/context/AuthContext"
 import { OrganizationProvider } from "./src/context/OrganizationContext"
 import KanbanScreen from "./src/screens/KanbanScreen"
-import ReportScreen from "./src/screens/ReportScreen"
 import ProfileScreen from "./src/screens/ProfileScreen"
 import TabBar from "./src/components/TarBar"
 import LoginScreen from "./src/screens/LoginScreen"
@@ -14,6 +13,7 @@ import { navigationRef } from './navigationUtils'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import KanbanDetailScreen from "./src/screens/KanbanDetailScreen"
 import { createStackNavigator } from '@react-navigation/stack'
+import { View } from "react-native"
 
 const Tab = createBottomTabNavigator()
 const Stack = createStackNavigator()
@@ -23,9 +23,9 @@ function AppNavigator() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         <LoginScreen />
-      </SafeAreaView>
+      </View>
     )
   }
 
@@ -37,14 +37,6 @@ function AppNavigator() {
           headerShown: false,
         }}
       >
-        <Tab.Screen
-          name="Report"
-          component={ReportScreen}
-          options={{
-            tabBarLabel: "Report",
-            tabBarIcon: ({ focused }) => <Feather name="bar-chart" size={20} color={focused ? "#4299e1" : "#718096"} />,
-          }}
-        />
         <Tab.Screen
           name="Kanban"
           component={KanbanScreen}
@@ -74,7 +66,7 @@ export default function App() {
           <NavigationContainer ref={navigationRef}>
             <Stack.Navigator>
               <Stack.Screen 
-                name="Main" 
+                name="Home" 
                 component={AppNavigator} 
                 options={{ headerShown: false }}
               />

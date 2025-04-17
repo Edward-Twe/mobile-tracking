@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { loginApi } from "../services/api"
+import { useOrganization } from "./OrganizationContext"
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -71,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await AsyncStorage.removeItem("authToken")
       await AsyncStorage.removeItem("userData")
+      await AsyncStorage.removeItem("employeeId")
       setUser(null)
       setIsAuthenticated(false)
       await AsyncStorage.removeItem('authState')

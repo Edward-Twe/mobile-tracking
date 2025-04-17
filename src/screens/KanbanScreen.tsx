@@ -26,6 +26,7 @@ const KanbanScreen = ({ navigation }: KanbanScreenProps) => {
     const fetchSchedules = async () => {
       if (!user?.id || !selectedOrganization?.id) {
         console.log("Missing user or org ID:", { user, selectedOrganization });
+        setLoading(false); // Stop loading if no user or organization
         return;
       }
 
@@ -96,6 +97,10 @@ const KanbanScreen = ({ navigation }: KanbanScreenProps) => {
           <ActivityIndicator size="large" color="#4299e1" />
           <Text style={styles.loadingText}>Loading schedules...</Text>
         </View>
+      ) : !selectedOrganization ? ( // Check if no organization is selected
+        <View style={styles.messageContainer}>
+          <Text style={styles.messageText}>Please select an organization to view schedules.</Text>
+        </View>
       ) : (
         <FlatList
           data={schedules}
@@ -136,6 +141,16 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: "#718096",
+  },
+  messageContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  messageText: {
+    color: "#718096",
+    fontSize: 16,
+    textAlign: "center",
   },
   schedulesList: {
     padding: 16,

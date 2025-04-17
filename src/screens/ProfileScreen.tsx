@@ -51,26 +51,6 @@ const ProfileScreen = () => {
         </View>
       </View>
 
-      <View style={styles.actionsSection}>
-        <TouchableOpacity style={styles.actionButton}>
-          <Feather name="settings" size={20} color="#4a5568" />
-          <Text style={styles.actionText}>Settings</Text>
-          <Feather name="chevron-right" size={20} color="#a0aec0" style={styles.actionArrow} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Feather name="help-circle" size={20} color="#4a5568" />
-          <Text style={styles.actionText}>Help & Support</Text>
-          <Feather name="chevron-right" size={20} color="#a0aec0" style={styles.actionArrow} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Feather name="info" size={20} color="#4a5568" />
-          <Text style={styles.actionText}>About</Text>
-          <Feather name="chevron-right" size={20} color="#a0aec0" style={styles.actionArrow} />
-        </TouchableOpacity>
-      </View>
-
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Feather name="log-out" size={20} color="#e53e3e" />
         <Text style={styles.logoutText}>Logout</Text>
